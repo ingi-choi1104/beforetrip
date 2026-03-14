@@ -100,11 +100,13 @@ class ScoringService {
   }
 
   /// 12개월 점수 계산 + 디버그 출력 (사용자에게는 미노출)
+  /// [quiet] = true 이면 디버그 출력 생략 (검색 필터 등 대량 호출 시 사용)
   static List<MonthScore> calculateScores(
     List<MonthlyClimate> climates,
     String destinationName,
-    DestinationTheme theme,
-  ) {
+    DestinationTheme theme, {
+    bool quiet = false,
+  }) {
     final isAurora = theme == DestinationTheme.aurora;
     final isWinter = theme == DestinationTheme.winter;
     final tempWeight = isWinter ? _wTempWinter : _wTemp;
@@ -142,7 +144,7 @@ class ScoringService {
       );
     }).toList();
 
-    if (kDebugMode) {
+    if (!quiet && kDebugMode) {
       final themeStr = theme.label;
       final sorted = [...scores]
         ..sort((a, b) => b.totalScore.compareTo(a.totalScore));

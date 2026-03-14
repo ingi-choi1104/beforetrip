@@ -51,7 +51,10 @@ class Destination {
   final CostOfLiving? costOfLiving;
   final int minDays; // 평균 여행 일수 최솟값 (0 = 정보 없음)
   final int maxDays; // 평균 여행 일수 최댓값 (0 = 정보 없음)
+  final int? flightPriceLow;  // 항공권 예상 최저가 (KRW, null = 정보 없음)
+  final int? flightPriceHigh; // 항공권 예상 최고가 (KRW, null = 정보 없음)
   final List<MonthlyClimate> climates; // 12개월 순서대로 (1월~12월)
+  final String description; // 도시 특징·주요 관광 포인트 한줄 요약
 
   const Destination({
     required this.id,
@@ -63,7 +66,10 @@ class Destination {
     this.costOfLiving,
     this.minDays = 0,
     this.maxDays = 0,
+    this.flightPriceLow,
+    this.flightPriceHigh,
     required this.climates,
+    this.description = '',
   });
 
   // DB 직렬화 (climates 제외 — 별도 테이블)
@@ -85,6 +91,9 @@ class Destination {
     },
     'min_days': minDays,
     'max_days': maxDays,
+    'flight_price_low': flightPriceLow,
+    'flight_price_high': flightPriceHigh,
+    'description': description,
   };
 
   static Destination fromMap(
@@ -100,6 +109,9 @@ class Destination {
     costOfLiving: CostOfLiving.fromMap(m),
     minDays: (m['min_days'] as int?) ?? 0,
     maxDays: (m['max_days'] as int?) ?? 0,
+    flightPriceLow: m['flight_price_low'] as int?,
+    flightPriceHigh: m['flight_price_high'] as int?,
     climates: climates,
+    description: (m['description'] as String?) ?? '',
   );
 }

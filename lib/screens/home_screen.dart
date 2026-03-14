@@ -1,8 +1,15 @@
 import 'package:flutter/material.dart';
 
+import '../models/city_group.dart';
 import '../models/destination.dart';
+import '../models/travel_mbti.dart';
 import '../services/database_service.dart';
+import '../services/mbti_storage_service.dart';
+import '../widgets/banner_ad_widget.dart';
 import 'destination_screen.dart';
+import 'mbti_recommend_screen.dart';
+import 'mbti_screen.dart';
+import 'search_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -13,8 +20,10 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   List<Destination> _all = [];
+  List<CityGroup> _cityGroups = [];
   bool _loading = true;
   String _searchQuery = '';
+  TravelMbtiResult? _savedMbti;
 
   static const _regionOrder = [
     '동아시아',
@@ -26,6 +35,7 @@ class _HomeScreenState extends State<HomeScreen> {
     '중동',
     '아프리카',
     '인도양',
+    '아프리카/인도양',
   ];
 
   @override
@@ -36,11 +46,21 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _loadFromDb() async {
     final dests = await DatabaseService.instance.getAllDestinations();
+    final groups = await DatabaseService.instance.getAllCityGroups();
+    final mbti = await MbtiStorageService.load();
     if (!mounted) return;
     setState(() {
       _all = dests;
+      _cityGroups = groups;
       _loading = false;
+      _savedMbti = mbti;
     });
+  }
+
+  Future<void> _reloadSavedMbti() async {
+    final mbti = await MbtiStorageService.load();
+    if (!mounted) return;
+    setState(() => _savedMbti = mbti);
   }
 
   List<Destination> get _filtered {
@@ -51,7 +71,6 @@ class _HomeScreenState extends State<HomeScreen> {
         .toList();
   }
 
-  // region → country → destinations
   Map<String, Map<String, List<Destination>>> get _grouped {
     final map = <String, Map<String, List<Destination>>>{};
     for (final dest in _filtered) {
@@ -68,28 +87,14 @@ class _HomeScreenState extends State<HomeScreen> {
     final colorScheme = Theme.of(context).colorScheme;
 
     if (_loading) {
-      return Scaffold(
-        body: Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const CircularProgressIndicator(),
-              const SizedBox(height: 16),
-              Text(
-                '여행지 정보를 불러오는 중…',
-                style: Theme.of(context).textTheme.bodyMedium,
-              ),
-            ],
-          ),
-        ),
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
       );
     }
 
     final grouped = _grouped;
     final regions = _regionOrder.where(grouped.containsKey).toList();
 
-    // 대륙 > 나라 > 도시 플랫 리스트로 변환 (SliverList용)
-    // item: (type: 'region'|'country'|'dest', data)
     final items = <({String type, Object data})>[];
     for (final region in regions) {
       items.add((type: 'region', data: region));
@@ -106,14 +111,51 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     return Scaffold(
+      bottomNavigationBar: const BottomBannerAd(),
       body: CustomScrollView(
         slivers: [
-          // 헤더 + 고정 검색바
           SliverAppBar(
             expandedHeight: 160,
             pinned: true,
             backgroundColor: colorScheme.primary,
             foregroundColor: colorScheme.onPrimary,
+            automaticallyImplyLeading: false,
+            leadingWidth: 96,
+            leading: Padding(
+              padding: const EdgeInsets.fromLTRB(8, 16, 0, 4),
+              child: FilledButton.tonal(
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => SearchScreen(
+                      destinations: _all,
+                      cityGroups: _cityGroups,
+                    ),
+                  ),
+                ),
+                style: FilledButton.styleFrom(
+                  padding: EdgeInsets.zero,
+                  textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                ),
+                child: const Text('조건 검색'),
+              ),
+            ),
+            actions: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(0, 16, 8, 4),
+                child: FilledButton.tonal(
+                  onPressed: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const MbtiScreen()),
+                  ).then((_) => _reloadSavedMbti()),
+                  style: FilledButton.styleFrom(
+                    padding: EdgeInsets.zero,
+                    textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                  ),
+                  child: const Text('여행 MBTI'),
+                ),
+              ),
+            ],
             flexibleSpace: FlexibleSpaceBar(
               title: Text(
                 '여행 가기 전',
@@ -155,7 +197,23 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
 
-          // 여행지 목록 (대륙 > 나라 > 도시)
+          if (_savedMbti != null)
+            SliverToBoxAdapter(
+              child: _SavedMbtiCard(
+                result: _savedMbti!,
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => MbtiRecommendScreen(result: _savedMbti!),
+                  ),
+                ),
+                onDelete: () async {
+                  await MbtiStorageService.clear();
+                  _reloadSavedMbti();
+                },
+              ),
+            ),
+
           if (items.isEmpty)
             const SliverFillRemaining(
               child: Center(child: Text('검색 결과가 없습니다.')),
@@ -211,7 +269,6 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   );
                 }
-                // dest
                 final dest = item.data as Destination;
                 return _DestinationTile(
                   destination: dest,
@@ -225,7 +282,10 @@ class _HomeScreenState extends State<HomeScreen> {
               }, childCount: items.length),
             ),
 
-          const SliverToBoxAdapter(child: SizedBox(height: 32)),
+          SliverSafeArea(
+            top: false,
+            sliver: const SliverToBoxAdapter(child: SizedBox(height: 16)),
+          ),
         ],
       ),
     );
@@ -266,7 +326,7 @@ class _DestinationTile extends StatelessWidget {
                         ),
                         if (theme != DestinationTheme.general) ...[
                           const SizedBox(width: 6),
-                          _ThemeChip(theme: theme),
+                          ThemeChip(theme: theme),
                         ],
                       ],
                     ),
@@ -289,10 +349,83 @@ class _DestinationTile extends StatelessWidget {
   }
 }
 
-class _ThemeChip extends StatelessWidget {
+class _SavedMbtiCard extends StatelessWidget {
+  final TravelMbtiResult result;
+  final VoidCallback onTap;
+  final VoidCallback onDelete;
+
+  const _SavedMbtiCard({
+    required this.result,
+    required this.onTap,
+    required this.onDelete,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+      child: Card(
+        clipBehavior: Clip.antiAlias,
+        color: colorScheme.secondaryContainer,
+        child: InkWell(
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 8, 12),
+            child: Row(
+              children: [
+                const Icon(Icons.bookmark, size: 18),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '저장된 MBTI',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: colorScheme.onSecondaryContainer.withAlpha(160),
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '${result.typeCode}  ${result.nickname}',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: colorScheme.onSecondaryContainer,
+                          letterSpacing: 1,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                TextButton(
+                  onPressed: onTap,
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                    textStyle: const TextStyle(fontSize: 12),
+                  ),
+                  child: const Text('추천 보기'),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close, size: 18),
+                  onPressed: onDelete,
+                  visualDensity: VisualDensity.compact,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class ThemeChip extends StatelessWidget {
   final DestinationTheme theme;
 
-  const _ThemeChip({required this.theme});
+  const ThemeChip({super.key, required this.theme});
 
   @override
   Widget build(BuildContext context) {

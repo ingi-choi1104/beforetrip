@@ -4,6 +4,7 @@ import '../models/cost_of_living.dart';
 import '../models/destination.dart';
 import '../models/monthly_climate.dart';
 import '../services/scoring_service.dart';
+import '../widgets/banner_ad_widget.dart';
 
 class DestinationScreen extends StatefulWidget {
   final Destination destination;
@@ -39,6 +40,7 @@ class _DestinationScreenState extends State<DestinationScreen> {
     final colorScheme = Theme.of(context).colorScheme;
 
     return Scaffold(
+      bottomNavigationBar: const BottomBannerAd(),
       body: CustomScrollView(
         slivers: [
           SliverAppBar(
@@ -102,12 +104,12 @@ class _DestinationScreenState extends State<DestinationScreen> {
                   costOfLiving: dest.costOfLiving,
                   minDays: dest.minDays,
                   maxDays: dest.maxDays,
+                  flightPriceLow: dest.flightPriceLow,
+                  flightPriceHigh: dest.flightPriceHigh,
                 ),
                 _CostOfLivingSection(costOfLiving: dest.costOfLiving),
                 _ClimateListSection(destination: dest, topMonths: _topMonths),
-                SizedBox(
-                  height: 16 + MediaQuery.paddingOf(context).bottom,
-                ),
+                SizedBox(height: 16 + MediaQuery.paddingOf(context).bottom),
               ],
             ),
           ),
@@ -125,6 +127,8 @@ class _RecommendationSection extends StatelessWidget {
   final CostOfLiving? costOfLiving;
   final int minDays;
   final int maxDays;
+  final int? flightPriceLow;
+  final int? flightPriceHigh;
 
   const _RecommendationSection({
     required this.destination,
@@ -132,6 +136,8 @@ class _RecommendationSection extends StatelessWidget {
     required this.costOfLiving,
     required this.minDays,
     required this.maxDays,
+    this.flightPriceLow,
+    this.flightPriceHigh,
   });
 
   static const _medals = ['🥇', '🥈', '🥉'];
@@ -148,6 +154,7 @@ class _RecommendationSection extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
     final hasColData = costOfLiving != null && costOfLiving!.hasData;
     final hasDaysData = minDays > 0 && maxDays > 0;
+    final hasFlightData = flightPriceLow != null && flightPriceHigh != null;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 20, 16, 8),
@@ -171,6 +178,15 @@ class _RecommendationSection extends StatelessWidget {
                   ),
                 ],
               ),
+              if (destination.description.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Text(
+                  destination.description,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
               const SizedBox(height: 16),
               // 추천 월 랭킹
               Text(
@@ -185,9 +201,9 @@ class _RecommendationSection extends StatelessWidget {
                 destination.theme == DestinationTheme.aurora
                     ? '오로라 지수·강수량을 종합한 추천입니다'
                     : '기온·강수량·일조시간을 종합한 추천입니다',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: colorScheme.outline,
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.bodySmall?.copyWith(color: colorScheme.outline),
               ),
               const SizedBox(height: 10),
               Row(
@@ -208,8 +224,8 @@ class _RecommendationSection extends StatelessWidget {
                   );
                 }),
               ),
-              // 요약 정보 박스들 (여행 일수 + 하루 예상 경비)
-              if (hasDaysData || hasColData) ...[
+              // 요약 정보 박스들
+              if (hasDaysData || hasColData || hasFlightData) ...[
                 const SizedBox(height: 14),
                 if (hasDaysData)
                   _SummaryBox(
@@ -222,11 +238,21 @@ class _RecommendationSection extends StatelessWidget {
                 if (hasColData)
                   _SummaryBox(
                     icon: Icons.payments_outlined,
-                    label: '하루 예상 경비',
+                    label: '하루 예상 경비(2인)',
                     value:
                         '약 ${costOfLiving!.estimatedDailyCostKRW ~/ 10000}만원 / 일',
                     colorScheme: colorScheme,
                   ),
+                if (hasFlightData) ...[
+                  if (hasDaysData || hasColData) const SizedBox(height: 8),
+                  _SummaryBox(
+                    icon: Icons.flight_takeoff_outlined,
+                    label: '항공권 예상 (왕복)',
+                    value:
+                        '${flightPriceLow! ~/ 10000}만 ~ ${flightPriceHigh! ~/ 10000}만원',
+                    colorScheme: colorScheme,
+                  ),
+                ],
               ],
             ],
           ),
@@ -605,9 +631,9 @@ class _CostOfLivingSection extends StatelessWidget {
           const SizedBox(width: 8),
           Text(
             '서울 대비 물가',
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-              fontWeight: FontWeight.bold,
-            ),
+            style: Theme.of(
+              context,
+            ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
           ),
           const Spacer(),
           Text(
@@ -627,9 +653,9 @@ class _CostOfLivingSection extends StatelessWidget {
               const SizedBox(width: 8),
               Text(
                 '서울 대비 물가',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
               ),
               const Spacer(),
               _OverallBadge(overall: col.overall),
@@ -638,9 +664,9 @@ class _CostOfLivingSection extends StatelessWidget {
           const SizedBox(height: 4),
           Text(
             '서울=1.0 기준  ·  중앙선이 서울 물가 수준',
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: colorScheme.outline,
-            ),
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: colorScheme.outline),
           ),
           const SizedBox(height: 16),
           _CostRow(icon: Icons.coffee, label: '커피', value: col.coffee),
@@ -665,10 +691,7 @@ class _CostOfLivingSection extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
       child: Card(
         elevation: 2,
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: cardContent,
-        ),
+        child: Padding(padding: const EdgeInsets.all(20), child: cardContent),
       ),
     );
   }
@@ -689,19 +712,18 @@ class _OverallBadge extends StatelessWidget {
       ),
       child: Text(
         '$label  ${overall.toStringAsFixed(2)}x',
-        style: TextStyle(
-          color: fg,
-          fontSize: 12,
-          fontWeight: FontWeight.bold,
-        ),
+        style: TextStyle(color: fg, fontSize: 12, fontWeight: FontWeight.bold),
       ),
     );
   }
 
   static (Color, Color, String) _levelInfo(double v) {
-    if (v < 0.7) return (const Color(0xFFE3F2FD), const Color(0xFF1565C0), '저렴');
-    if (v < 0.95) return (const Color(0xFFE8F5E9), const Color(0xFF2E7D32), '보통');
-    if (v < 1.3) return (const Color(0xFFFFF9C4), const Color(0xFFF57F17), '비슷');
+    if (v < 0.7)
+      return (const Color(0xFFE3F2FD), const Color(0xFF1565C0), '저렴');
+    if (v < 0.95)
+      return (const Color(0xFFE8F5E9), const Color(0xFF2E7D32), '보통');
+    if (v < 1.3)
+      return (const Color(0xFFFFF9C4), const Color(0xFFF57F17), '비슷');
     return (const Color(0xFFFFEBEE), const Color(0xFFC62828), '비쌈');
   }
 }
@@ -839,10 +861,7 @@ class _SummaryBox extends StatelessWidget {
           const SizedBox(width: 8),
           Text(
             label,
-            style: TextStyle(
-              fontSize: 13,
-              color: colorScheme.onSurfaceVariant,
-            ),
+            style: TextStyle(fontSize: 13, color: colorScheme.onSurfaceVariant),
           ),
           const Spacer(),
           Text(

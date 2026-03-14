@@ -2,7 +2,10 @@ import 'package:flutter/foundation.dart';
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
 
+import '../data/city_group_seed.dart';
+import '../data/descriptions.dart';
 import '../data/seed_data.dart';
+import '../models/city_group.dart';
 import '../models/destination.dart';
 import '../models/monthly_climate.dart';
 
@@ -24,19 +27,21 @@ class DatabaseService {
     try {
       return await openDatabase(
         path,
-        version: 16,
+        version: 22,
         onCreate: _onCreate,
         onUpgrade: (db, oldVersion, newVersion) async {
           debugPrint('[DB] 버전 업그레이드 $oldVersion → $newVersion: 재생성');
           await db.execute('DROP TABLE IF EXISTS monthly_climates');
           await db.execute('DROP TABLE IF EXISTS destinations');
+          await db.execute('DROP TABLE IF EXISTS city_groups');
           await _onCreate(db, newVersion);
+          return;
         },
       );
     } catch (e) {
       debugPrint('[DB] 오픈 실패, 재생성: $e');
       await deleteDatabase(path);
-      return await openDatabase(path, version: 14, onCreate: _onCreate);
+      return await openDatabase(path, version: 21, onCreate: _onCreate);
     }
   }
 
@@ -54,8 +59,11 @@ class DatabaseService {
         col_beer      REAL,
         col_transport REAL,
         col_hotel     REAL,
-        min_days      INTEGER NOT NULL DEFAULT 0,
-        max_days      INTEGER NOT NULL DEFAULT 0
+        min_days           INTEGER NOT NULL DEFAULT 0,
+        max_days           INTEGER NOT NULL DEFAULT 0,
+        flight_price_low   INTEGER,
+        flight_price_high  INTEGER,
+        description        TEXT    NOT NULL DEFAULT ''
       )
     ''');
 
@@ -77,6 +85,17 @@ class DatabaseService {
       )
     ''');
 
+    await db.execute('''
+      CREATE TABLE city_groups (
+        id       INTEGER PRIMARY KEY AUTOINCREMENT,
+        name     TEXT    NOT NULL,
+        region   TEXT    NOT NULL,
+        min_days INTEGER NOT NULL DEFAULT 0,
+        max_days INTEGER NOT NULL DEFAULT 0,
+        dest_ids TEXT    NOT NULL
+      )
+    ''');
+
     await _seed(db);
     debugPrint('[DB] beforetrip.db 생성 완료 — 시드 데이터 삽입됨');
   }
@@ -84,10 +103,15 @@ class DatabaseService {
   Future<void> _seed(Database db) async {
     final batch = db.batch();
     for (final dest in SeedData.destinations) {
-      batch.insert('destinations', dest.toMap());
+      final map = dest.toMap();
+      map['description'] = DestinationDescriptions.data[dest.id] ?? '';
+      batch.insert('destinations', map);
       for (final climate in dest.climates) {
         batch.insert('monthly_climates', climate.toMap(dest.id));
       }
+    }
+    for (final group in CityGroupSeed.groups) {
+      batch.insert('city_groups', group.toMap());
     }
     await batch.commit(noResult: true);
   }
@@ -128,6 +152,12 @@ class DatabaseService {
       orderBy: 'month',
     );
     return rows.map(MonthlyClimate.fromMap).toList();
+  }
+
+  Future<List<CityGroup>> getAllCityGroups() async {
+    final db = await _database;
+    final rows = await db.query('city_groups', orderBy: 'region, name');
+    return rows.map(CityGroup.fromMap).toList();
   }
 
   // ─── 추가 / 수정 ──────────────────────────────────────

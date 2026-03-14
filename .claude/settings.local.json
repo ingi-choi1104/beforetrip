@@ -5,7 +5,12 @@
       "Bash(flutter pub:*)",
       "Bash(python3:*)",
       "Bash(python:*)",
-      "Bash(rm:*)"
+      "Bash(rm:*)",
+      "Bash(findstr:*)",
+      "Bash(dart run:*)",
+      "Bash(cd \"D:/Files/Flutter/beforetrip\" && flutter analyze 2>&1 | grep -v \"^Analyzing\" | grep -v \"^$\" | head -40)",
+      "Bash(cd \"D:/Files/Flutter/beforetrip\" && flutter analyze 2>&1 | grep -v \"^Analyzing\" | grep -v \"^$\")",
+      "Bash(cd:*)"
     ]
   }
 }

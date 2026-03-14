@@ -1,9 +1,9 @@
 class CostOfLiving {
-  final double coffee;     // 커피 가격 지수 (서울=1.0)
-  final double meal;       // 레스토랑 식사 지수 (서울=1.0)
-  final double beer;       // 맥주 가격 지수 (서울=1.0)
-  final double transport;  // 대중교통 1회 지수 (서울=1.0)
-  final double hotel;      // 중급 호텔 1박 지수 (서울=1.0)
+  final double coffee; // 커피 가격 지수 (서울=1.0)
+  final double meal; // 레스토랑 식사 지수 (서울=1.0)
+  final double beer; // 맥주 가격 지수 (서울=1.0)
+  final double transport; // 대중교통 1회 지수 (서울=1.0)
+  final double hotel; // 중급 호텔 1박 지수 (서울=1.0)
 
   const CostOfLiving({
     required this.coffee,
@@ -35,11 +35,11 @@ class CostOfLiving {
   /// 커피 5,000 + 식사 2끼 35,000 + 맥주 6,000 + 교통 3,000 + 호텔 130,000 + 잡비 10%
   int get estimatedDailyCostKRW {
     final raw =
-        (5000 * coffee +
-            35000 * meal +
-            6000 * beer +
-            3000 * transport +
-            130000 * hotel) *
+        (10000 * coffee +
+            70000 * meal +
+            12000 * beer +
+            6000 * transport +
+            180000 * hotel) *
         1.1;
     return ((raw / 10000).round()) * 10000;
   }
